@@ -450,6 +450,8 @@ class CrossPointSettings {
   // Debug/test builds can disable stat writes so navigation tests do not affect personal reading stats.
   uint8_t trackReadingStats = 1;
 #endif
+  // Explore Mode: capture a return point on qualifying menu jumps so the user can navigate back.
+  uint8_t exploreMode = 0;
 
   ~CrossPointSettings() = default;
 

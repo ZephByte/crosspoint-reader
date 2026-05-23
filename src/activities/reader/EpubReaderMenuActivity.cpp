@@ -141,10 +141,12 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
     ReaderOptionsActivity::SaveGlobalSettingsCallback saveGlobalSettingsCallback, void* saveGlobalSettingsContext,
     ReaderOptionsActivity::GlobalSettingsEditCallback beginGlobalSettingsEditCallback,
     void* beginGlobalSettingsEditContext, const bool stablePageNumbersAvailable,
-    ReaderOptionsActivity::GlobalSettingsEditCallback endGlobalSettingsEditCallback, void* endGlobalSettingsEditContext)
+    ReaderOptionsActivity::GlobalSettingsEditCallback endGlobalSettingsEditCallback, void* endGlobalSettingsEditContext,
+    const bool hasReturnPoint, std::string returnLabel)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes, hasBookmarks, hasClippings, isCurrentPageBookmarked, isBookCompleted,
-                               showReadingPaceReset)),
+                               showReadingPaceReset, hasReturnPoint)),
+      returnLabel(std::move(returnLabel)),
       title(title),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
@@ -166,16 +168,21 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(bool
                                                                             bool hasClippings,
                                                                             bool isCurrentPageBookmarked,
                                                                             bool isBookCompleted,
-                                                                            bool showReadingPaceReset) {
+                                                                            bool showReadingPaceReset,
+                                                                            bool hasReturnPoint) {
   TabMenuItems items;
   auto& mainItems = items[MAIN_TAB_INDEX];
   auto& bookmarkItems = items[BOOKMARKS_TAB_INDEX];
   auto& settingsItems = items[SETTINGS_TAB_INDEX];
 
-  mainItems.reserve(8 + (hasFootnotes ? 1u : 0u));
+  mainItems.reserve(8 + (hasFootnotes ? 1u : 0u) + (hasReturnPoint ? 2u : 0u));
   bookmarkItems.reserve(8 + (hasBookmarks ? 2u : 0u) + (hasClippings ? 1u : 0u));
   settingsItems.reserve(2 + (showReadingPaceReset ? 1u : 0u));
 
+  if (hasReturnPoint) {
+    mainItems.push_back({MenuAction::RETURN_TO_PREVIOUS, StrId::STR_RETURN_TO_PREVIOUS});
+    mainItems.push_back({MenuAction::CANCEL_RETURN, StrId::STR_CANCEL_RETURN});
+  }
   if (hasFootnotes) {
     mainItems.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
@@ -410,7 +417,13 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
 
   GUI.drawList(
       renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, items.size(), selectedIndex,
-      [&items](int index) { return I18N.get(items[index].labelId); }, nullptr, nullptr,
+      [&items, this](int index) -> std::string {
+        if (items[index].action == MenuAction::RETURN_TO_PREVIOUS && !returnLabel.empty()) {
+          return returnLabel;
+        }
+        return I18N.get(items[index].labelId);
+      },
+      nullptr, nullptr,
       [this](int index) -> std::string {
         const auto& items = activeMenuItems();
         if (index < 0 || index >= static_cast<int>(items.size())) {
