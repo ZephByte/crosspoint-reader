@@ -185,8 +185,10 @@ HalFile::~HalFile() {
 HalFile::HalFile(HalFile&&) = default;
 
 HalFile& HalFile::operator=(HalFile&& other) {
-  if (this == &other) return *this;
-  close();
+  if (this == &other) {
+    return *this;
+  }
+  HalStorage::StorageLock lock;
   impl = std::move(other.impl);
   return *this;
 }
@@ -223,6 +225,7 @@ bool HalStorage::rename(const char* oldPath, const char* newPath) {
 bool HalStorage::rmdir(const char* path) { HAL_STORAGE_WRAPPED_CALL(rmdir, path); }
 
 bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFile& file) {
+<<<<<<< HEAD
   file.close();
   FsFile fsFile;
   bool ok = false;
@@ -243,6 +246,16 @@ bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFi
   }
   file = HalFile(std::move(impl));
   return true;
+=======
+  FsFile fsFile;
+  bool ok;
+  {
+    StorageLock lock;
+    ok = SDCard.openFileForRead(moduleName, path, fsFile);
+  }
+  file = HalFile(std::make_unique<HalFile::Impl>(std::move(fsFile)));
+  return ok;
+>>>>>>> 80659aa0e (fix: serialize HalFile move assignment)
 }
 
 bool HalStorage::openFileForRead(const char* moduleName, const std::string& path, HalFile& file) {
@@ -254,6 +267,7 @@ bool HalStorage::openFileForRead(const char* moduleName, const String& path, Hal
 }
 
 bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalFile& file) {
+<<<<<<< HEAD
   file.close();
   FsFile fsFile;
   bool ok = false;
@@ -274,6 +288,16 @@ bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalF
   }
   file = HalFile(std::move(impl));
   return true;
+=======
+  FsFile fsFile;
+  bool ok;
+  {
+    StorageLock lock;
+    ok = SDCard.openFileForWrite(moduleName, path, fsFile);
+  }
+  file = HalFile(std::make_unique<HalFile::Impl>(std::move(fsFile)));
+  return ok;
+>>>>>>> 80659aa0e (fix: serialize HalFile move assignment)
 }
 
 bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, HalFile& file) {
