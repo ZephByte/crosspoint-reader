@@ -68,7 +68,7 @@ inline bool saveReturnPoint(Epub& epub, const ReturnPoint& point) {
   return true;
 }
 
-inline std::optional<ReturnPoint> loadReturnPoint(Epub& epub) {
+inline std::optional<ReturnPoint> loadReturnPoint(const Epub& epub) {
   HalFile f;
   if (!Storage.openFileForRead("ERS", epub.getCachePath() + RETURN_POINT_FILENAME, f)) {
     return std::nullopt;
@@ -86,7 +86,7 @@ inline std::optional<ReturnPoint> loadReturnPoint(Epub& epub) {
   return p;
 }
 
-inline void clearReturnPoint(Epub& epub) {
+inline void clearReturnPoint(const Epub& epub) {
   const std::string path = epub.getCachePath() + RETURN_POINT_FILENAME;
   if (Storage.remove(path.c_str())) {
     LOG_DBG("ERS", "Return point cleared");

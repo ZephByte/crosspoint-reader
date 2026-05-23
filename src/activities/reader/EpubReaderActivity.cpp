@@ -705,20 +705,19 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       const int snapshotSpine = currentSpineIndex;
       const int snapshotPage = section ? section->currentPage : nextPageNumber;
       const int snapshotPageCount = section ? section->pageCount : cachedChapterTotalPageCount;
-      startActivityForResult(
-          std::make_unique<EpubReaderFootnotesActivity>(renderer, mappedInput, currentPageFootnotes),
-          [this, snapshotSpine, snapshotPage, snapshotPageCount](const ActivityResult& result) {
-            if (!result.isCancelled) {
-              // Scope ends before navigateToHref so its own RenderLock acquire doesn't deadlock.
-              {
-                RenderLock lock(*this);
-                captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
-              }
-              const auto& footnoteResult = std::get<FootnoteResult>(result.data);
-              navigateToHref(footnoteResult.href, true);
-            }
-            requestUpdate();
-          });
+      startActivityForResult(std::make_unique<EpubReaderFootnotesActivity>(renderer, mappedInput, currentPageFootnotes),
+                             [this, snapshotSpine, snapshotPage, snapshotPageCount](const ActivityResult& result) {
+                               if (!result.isCancelled) {
+                                 // Scope ends before navigateToHref so its own RenderLock acquire doesn't deadlock.
+                                 {
+                                   RenderLock lock(*this);
+                                   captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
+                                 }
+                                 const auto& footnoteResult = std::get<FootnoteResult>(result.data);
+                                 navigateToHref(footnoteResult.href, true);
+                               }
+                               requestUpdate();
+                             });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::GO_TO_PERCENT: {
