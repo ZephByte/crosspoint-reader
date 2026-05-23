@@ -2281,8 +2281,7 @@ void GfxRenderer::invertRect(const int x, const int y, const int width, const in
     const int firstByte = x0 / 8;
     const int lastByte = x1 / 8;
     if (firstByte == lastByte) {
-      const uint8_t mask = static_cast<uint8_t>(0xFF >> (x0 % 8)) &
-                           static_cast<uint8_t>(0xFF << (7 - x1 % 8));
+      const uint8_t mask = static_cast<uint8_t>(0xFF >> (x0 % 8)) & static_cast<uint8_t>(0xFF << (7 - x1 % 8));
       frameBuffer[rowBase + firstByte] ^= mask;
     } else {
       frameBuffer[rowBase + firstByte] ^= static_cast<uint8_t>(0xFF >> (x0 % 8));
