@@ -41,7 +41,7 @@ class EpubReaderMenuActivity final : public Activity {
     SAVE_CLIPPING,
     VIEW_CLIPPINGS,
     RETURN_TO_PREVIOUS,
-    CANCEL_RETURN
+    STAY_HERE
   };
 
   explicit EpubReaderMenuActivity(

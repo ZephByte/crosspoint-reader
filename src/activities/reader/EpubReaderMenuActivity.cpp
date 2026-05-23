@@ -181,7 +181,7 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(bool
 
   if (hasReturnPoint) {
     mainItems.push_back({MenuAction::RETURN_TO_PREVIOUS, StrId::STR_RETURN_TO_PREVIOUS});
-    mainItems.push_back({MenuAction::CANCEL_RETURN, StrId::STR_CANCEL_RETURN});
+    mainItems.push_back({MenuAction::STAY_HERE, StrId::STR_STAY_HERE});
   }
   if (hasFootnotes) {
     mainItems.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
