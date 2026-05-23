@@ -2585,9 +2585,13 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     case EpubReaderMenuActivity::MenuAction::SELECT_CHAPTER: {
       const int spineIdx = currentSpineIndex;
       const std::string path = epub->getPath();
-      const int snapshotSpine = currentSpineIndex;
-      const int snapshotPage = section ? section->currentPage : nextPageNumber;
-      const int snapshotPageCount = section ? section->pageCount : cachedChapterTotalPageCount;
+      // If inside a footnote, anchor the return point to the pre-footnote reading
+      // position (bottom of back stack) so "Back to..." skips the footnote detour.
+      const int snapshotSpine = (footnoteDepth > 0) ? savedPositions[0].spineIndex : currentSpineIndex;
+      const int snapshotPage =
+          (footnoteDepth > 0) ? savedPositions[0].pageNumber : (section ? section->currentPage : nextPageNumber);
+      const int snapshotPageCount =
+          (footnoteDepth > 0) ? 0 : (section ? section->pageCount : cachedChapterTotalPageCount);
       pauseReadingPaceTimer("chapter_selection");
       startActivityForResult(
           std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx),
@@ -2597,6 +2601,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
               RenderLock lock(*this);
 
               captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
+              footnoteDepth = 0;
               clearFootnotePreviewState();
               currentSpineIndex = chapterResult.spineIndex;
 
@@ -2616,19 +2621,11 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::FOOTNOTES: {
-      const int snapshotSpine = currentSpineIndex;
-      const int snapshotPage = section ? section->currentPage : nextPageNumber;
-      const int snapshotPageCount = section ? section->pageCount : cachedChapterTotalPageCount;
       pauseReadingPaceTimer("footnotes");
       startActivityForResult(
           std::make_unique<EpubReaderFootnotesActivity>(renderer, mappedInput, currentPageFootnotes),
-          [this, snapshotSpine, snapshotPage, snapshotPageCount](const ActivityResult& result) {
+          [this](const ActivityResult& result) {
             if (!result.isCancelled) {
-              // Scope ends before navigateToHref so its own RenderLock acquire doesn't deadlock.
-              {
-                RenderLock lock(*this);
-                captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
-              }
               const auto& footnoteResult = std::get<FootnoteResult>(result.data);
               navigateToHref(footnoteResult.href, true);
             } else {
@@ -3047,6 +3044,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
         {
           RenderLock lock(*this);
           clearReturnPoint();
+          footnoteDepth = 0;
           currentSpineIndex = target.spineIndex;
           nextPageNumber = target.pageNumber;
           // Cached page count lets render() remap proportionally if layout changed since capture.
