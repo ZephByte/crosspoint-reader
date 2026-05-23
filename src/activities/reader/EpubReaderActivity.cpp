@@ -820,7 +820,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       }
       break;
     }
-    case EpubReaderMenuActivity::MenuAction::CANCEL_RETURN: {
+    case EpubReaderMenuActivity::MenuAction::STAY_HERE: {
       {
         RenderLock lock(*this);
         clearReturnPoint();
