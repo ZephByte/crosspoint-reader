@@ -284,6 +284,7 @@ class EpubReaderActivity final : public Activity {
   void drawRenderModeToastBuffer(const char* msg);
   bool restoreRenderModeToastRegion();
 
+  EpubReaderUtils::ReturnPoint computePreJumpSnapshot() const;
   // Caller must hold RenderLock.
   std::optional<EpubReaderUtils::ReturnPoint> captureReturnPointIfAbsent(int spineIndex, int pageNumber, int pageCount);
   // Caller must NOT hold RenderLock.
