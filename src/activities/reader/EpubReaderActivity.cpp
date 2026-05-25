@@ -2598,20 +2598,23 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
           [this, snapshotSpine, snapshotPage, snapshotPageCount](const ActivityResult& result) {
             if (!result.isCancelled) {
               const auto& chapterResult = std::get<ChapterResult>(result.data);
-              RenderLock lock(*this);
+              std::optional<EpubReaderUtils::ReturnPoint> toPersist;
+              {
+                RenderLock lock(*this);
+                toPersist = captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
+                footnoteDepth = 0;
+                clearFootnotePreviewState();
+                currentSpineIndex = chapterResult.spineIndex;
 
-              captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
-              footnoteDepth = 0;
-              clearFootnotePreviewState();
-              currentSpineIndex = chapterResult.spineIndex;
+                // If anchor is not empty, it will be used later to calculate the page number.
+                pendingAnchor = chapterResult.anchor;
 
-              // If anchor is not empty, it will be used later to calculate the page number.
-              pendingAnchor = chapterResult.anchor;
+                // Otherwise page 0 will be used.
+                nextPageNumber = 0;
 
-              // Otherwise page 0 will be used.
-              nextPageNumber = 0;
-
-              section.reset();
+                section.reset();
+              }
+              if (toPersist) persistReturnPointToSd(*toPersist);
               armReadingPaceWarmup("chapter_jump");
               pauseReadingPaceTimer("chapter_jump");
             } else {
@@ -2651,11 +2654,12 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
           std::make_unique<EpubReaderPercentSelectionActivity>(renderer, mappedInput, initialPercent),
           [this, snapshotSpine, snapshotPage, snapshotPageCount](const ActivityResult& result) {
             if (!result.isCancelled) {
-              // Scope ends before jumpToPercent so its own RenderLock acquire doesn't deadlock.
+              std::optional<EpubReaderUtils::ReturnPoint> toPersist;
               {
                 RenderLock lock(*this);
-                captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
+                toPersist = captureReturnPointIfAbsent(snapshotSpine, snapshotPage, snapshotPageCount);
               }
+              if (toPersist) persistReturnPointToSd(*toPersist);
               jumpToPercent(std::get<PercentResult>(result.data).percent);
             } else {
               resumeReadingPaceTimer("percent_selection_cancel");
@@ -4627,14 +4631,22 @@ void EpubReaderActivity::cacheCurrentSectionPosition() {
   }
 }
 
-void EpubReaderActivity::captureReturnPointIfAbsent(int spineIndex, int pageNumber, int pageCount) {
+std::optional<EpubReaderUtils::ReturnPoint> EpubReaderActivity::captureReturnPointIfAbsent(int spineIndex,
+                                                                                           int pageNumber,
+                                                                                           int pageCount) {
   if (!SETTINGS.exploreMode || returnPoint.has_value() || !epub) {
-    return;
+    return std::nullopt;
   }
   returnPoint = EpubReaderUtils::ReturnPoint{spineIndex, pageNumber, pageCount};
-  if (!EpubReaderUtils::saveReturnPoint(*epub, *returnPoint)) {
-    LOG_ERR("ERS", "Failed to save return point; disabling Explore return: spine=%d page=%d count=%d", spineIndex,
-            pageNumber, pageCount);
+  return returnPoint;
+}
+
+void EpubReaderActivity::persistReturnPointToSd(const EpubReaderUtils::ReturnPoint& point) {
+  if (!epub) return;
+  if (!EpubReaderUtils::saveReturnPoint(*epub, point)) {
+    LOG_ERR("ERS", "Failed to save return point; disabling Explore return: spine=%d page=%d count=%d", point.spineIndex,
+            point.pageNumber, point.pageCount);
+    RenderLock lock(*this);
     clearReturnPoint();
   }
 }
