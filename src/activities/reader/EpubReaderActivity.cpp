@@ -639,40 +639,6 @@ void EpubReaderActivity::jumpToPercent(int percent) {
 }
 
 void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action) {
-  auto progressChangeResultHandler = [this](const ActivityResult& result) {
-    loadCachedBookmarks();
-    if (!result.isCancelled) {
-      const auto& sync = std::get<ProgressChangeResult>(result.data);
-      int targetSpineIndex = sync.spineIndex;
-      int targetPage = sync.page;
-      const int activeTotalPages = section ? section->estimatedTotalPages() : 0;
-      const bool cachedPageMatchesActiveSection = section && sync.totalPages > 0 &&
-                                                  currentSpineIndex == sync.spineIndex && sync.page >= 0 &&
-                                                  sync.page < sync.totalPages && activeTotalPages == sync.totalPages;
-
-      if (!cachedPageMatchesActiveSection && sync.hasSavedProgress) {
-        const int totalPages = section ? section->estimatedTotalPages() : cachedChapterTotalPageCount;
-        CrossPointPosition fallback =
-            ProgressMapper::toCrossPoint(epub, {sync.xpath, sync.percentage}, renderer, currentSpineIndex, totalPages);
-        targetSpineIndex = fallback.spineIndex;
-        targetPage = fallback.pageNumber;
-      }
-
-      if (currentSpineIndex != targetSpineIndex) {
-        RenderLock lock(*this);
-        currentSpineIndex = targetSpineIndex;
-        nextPageNumber = targetPage;
-        section.reset();
-      } else if (section && section->currentPage != targetPage) {
-        RenderLock lock(*this);
-        const int clampedTargetPage = std::max(0, targetPage);
-        section->currentPage = clampedTargetPage;
-      } else if (!section) {
-        nextPageNumber = targetPage;
-      }
-    }
-  };
-
   switch (action) {
     case EpubReaderMenuActivity::MenuAction::SELECT_CHAPTER: {
       const int spineIdx = currentSpineIndex;
@@ -788,9 +754,47 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
+      const auto snapshot = computePreJumpSnapshot();
       startActivityForResult(
           std::make_unique<EpubReaderBookmarksActivity>(renderer, mappedInput, epub, epub->getPath()),
-          progressChangeResultHandler);
+          [this, snapshot](const ActivityResult& result) {
+            loadCachedBookmarks();
+            if (result.isCancelled) return;
+            const auto& sync = std::get<ProgressChangeResult>(result.data);
+            int targetSpineIndex = sync.spineIndex;
+            int targetPage = sync.page;
+            const int activeTotalPages = section ? section->estimatedTotalPages() : 0;
+            const bool cachedPageMatchesActiveSection = section && sync.totalPages > 0 &&
+                                                        currentSpineIndex == sync.spineIndex && sync.page >= 0 &&
+                                                        sync.page < sync.totalPages && activeTotalPages == sync.totalPages;
+
+            if (!cachedPageMatchesActiveSection && sync.hasSavedProgress) {
+              const int totalPages = section ? section->estimatedTotalPages() : cachedChapterTotalPageCount;
+              CrossPointPosition fallback = ProgressMapper::toCrossPoint(epub, {sync.xpath, sync.percentage}, renderer,
+                                                                         currentSpineIndex, totalPages);
+              targetSpineIndex = fallback.spineIndex;
+              targetPage = fallback.pageNumber;
+            }
+
+            if (currentSpineIndex == targetSpineIndex && section && section->currentPage == targetPage) return;
+
+            std::optional<EpubReaderUtils::ReturnPoint> toPersist;
+            {
+              RenderLock lock(*this);
+              toPersist = captureReturnPointIfAbsent(snapshot.spineIndex, snapshot.pageNumber, snapshot.pageCount);
+              if (currentSpineIndex != targetSpineIndex) {
+                currentSpineIndex = targetSpineIndex;
+                nextPageNumber = targetPage;
+                section.reset();
+              } else if (section && section->currentPage != targetPage) {
+                const int clampedTargetPage = std::max(0, targetPage);
+                section->currentPage = clampedTargetPage;
+              } else if (!section) {
+                nextPageNumber = targetPage;
+              }
+            }
+            if (toPersist) persistReturnPointToSd(*toPersist);
+          });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::TOGGLE_BOOKMARK: {
