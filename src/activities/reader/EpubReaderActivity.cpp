@@ -2963,36 +2963,42 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::VIEW_BOOKMARKS: {
+      const auto snapshot = computePreJumpSnapshot();
       pauseReadingPaceTimer("bookmark_list");
       startActivityForResult(
           std::make_unique<EpubReaderBookmarkListActivity>(renderer, mappedInput, BOOKMARKS.getBookmarks()),
-          [this](const ActivityResult& result) {
+          [this, snapshot](const ActivityResult& result) {
             if (!result.isCancelled) {
               const auto& bm = std::get<BookmarkResult>(result.data);
-              RenderLock lock(*this);
-              clearFootnotePreviewState();
-              if (section && currentSpineIndex == bm.spineIndex) {
-                bool resolved = false;
-                const uint16_t fallbackPage =
-                    pageFromStoredProgress(bm.progress, static_cast<uint16_t>(section->estimatedTotalPages()));
-                if (bm.paragraphIndex != UINT16_MAX) {
-                  section->currentPage = resolveParagraphJumpPage(*section, bm.paragraphIndex, fallbackPage);
-                  resolved = true;
-                  LOG_DBG("ERS", "Resolved bookmark paragraph %u to page %d", bm.paragraphIndex, section->currentPage);
+              std::optional<EpubReaderUtils::ReturnPoint> toPersist;
+              {
+                RenderLock lock(*this);
+                toPersist = captureReturnPointIfAbsent(snapshot.spineIndex, snapshot.pageNumber, snapshot.pageCount);
+                clearFootnotePreviewState();
+                if (section && currentSpineIndex == bm.spineIndex) {
+                  bool resolved = false;
+                  const uint16_t fallbackPage =
+                      pageFromStoredProgress(bm.progress, static_cast<uint16_t>(section->estimatedTotalPages()));
+                  if (bm.paragraphIndex != UINT16_MAX) {
+                    section->currentPage = resolveParagraphJumpPage(*section, bm.paragraphIndex, fallbackPage);
+                    resolved = true;
+                    LOG_DBG("ERS", "Resolved bookmark paragraph %u to page %d", bm.paragraphIndex, section->currentPage);
+                  }
+                  if (!resolved) {
+                    section->currentPage = fallbackPage;
+                  }
+                  nextPageNumber = section->currentPage;
+                  pendingPercentJump = false;
+                  pendingParagraphIndex = UINT16_MAX;
+                } else {
+                  currentSpineIndex = bm.spineIndex;
+                  pendingSpineProgress = bm.progress;
+                  pendingParagraphIndex = bm.paragraphIndex;
+                  pendingPercentJump = true;
+                  section.reset();
                 }
-                if (!resolved) {
-                  section->currentPage = fallbackPage;
-                }
-                nextPageNumber = section->currentPage;
-                pendingPercentJump = false;
-                pendingParagraphIndex = UINT16_MAX;
-              } else {
-                currentSpineIndex = bm.spineIndex;
-                pendingSpineProgress = bm.progress;
-                pendingParagraphIndex = bm.paragraphIndex;
-                pendingPercentJump = true;
-                section.reset();
               }
+              if (toPersist) persistReturnPointToSd(*toPersist);
               armReadingPaceWarmup("bookmark_jump");
               pauseReadingPaceTimer("bookmark_jump");
             } else {
