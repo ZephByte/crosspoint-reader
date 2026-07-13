@@ -2619,17 +2619,16 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     }
     case EpubReaderMenuActivity::MenuAction::FOOTNOTES: {
       pauseReadingPaceTimer("footnotes");
-      startActivityForResult(
-          std::make_unique<EpubReaderFootnotesActivity>(renderer, mappedInput, currentPageFootnotes),
-          [this](const ActivityResult& result) {
-            if (!result.isCancelled) {
-              const auto& footnoteResult = std::get<FootnoteResult>(result.data);
-              navigateToHref(footnoteResult.href, true);
-            } else {
-              resumeReadingPaceTimer("footnotes_cancel");
-            }
-            requestUpdate();
-          });
+      startActivityForResult(std::make_unique<EpubReaderFootnotesActivity>(renderer, mappedInput, currentPageFootnotes),
+                             [this](const ActivityResult& result) {
+                               if (!result.isCancelled) {
+                                 const auto& footnoteResult = std::get<FootnoteResult>(result.data);
+                                 navigateToHref(footnoteResult.href, true);
+                               } else {
+                                 resumeReadingPaceTimer("footnotes_cancel");
+                               }
+                               requestUpdate();
+                             });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::GO_TO_PERCENT: {
@@ -2982,7 +2981,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
                   if (bm.paragraphIndex != UINT16_MAX) {
                     section->currentPage = resolveParagraphJumpPage(*section, bm.paragraphIndex, fallbackPage);
                     resolved = true;
-                    LOG_DBG("ERS", "Resolved bookmark paragraph %u to page %d", bm.paragraphIndex, section->currentPage);
+                    LOG_DBG("ERS", "Resolved bookmark paragraph %u to page %d", bm.paragraphIndex,
+                            section->currentPage);
                   }
                   if (!resolved) {
                     section->currentPage = fallbackPage;

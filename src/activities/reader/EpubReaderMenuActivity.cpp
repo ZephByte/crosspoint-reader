@@ -164,12 +164,9 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
       endGlobalSettingsEditCallback(endGlobalSettingsEditCallback),
       endGlobalSettingsEditContext(endGlobalSettingsEditContext) {}
 
-EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes, bool hasBookmarks,
-                                                                            bool hasClippings,
-                                                                            bool isCurrentPageBookmarked,
-                                                                            bool isBookCompleted,
-                                                                            bool showReadingPaceReset,
-                                                                            bool hasReturnPoint) {
+EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
+    bool hasFootnotes, bool hasBookmarks, bool hasClippings, bool isCurrentPageBookmarked, bool isBookCompleted,
+    bool showReadingPaceReset, bool hasReturnPoint) {
   TabMenuItems items;
   auto& mainItems = items[MAIN_TAB_INDEX];
   auto& bookmarkItems = items[BOOKMARKS_TAB_INDEX];
