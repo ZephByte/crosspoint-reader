@@ -52,15 +52,9 @@ void EpubReaderBookmarksActivity::onEnter() {
 
 void EpubReaderBookmarksActivity::onExit() { Activity::onExit(); }
 
-int EpubReaderBookmarksActivity::getGutterBottom(const GfxRenderer& renderer) {
-  const auto orientation = renderer.getOrientation();
-  const bool isPortrait = orientation == GfxRenderer::Orientation::Portrait;
-  return isPortrait ? 75 : 40;  // Reserve vertical space for button hints at the bottom
-}
-
 int EpubReaderBookmarksActivity::getListHeight(const GfxRenderer& renderer) {
-  const auto pageHeight = renderer.getScreenHeight();
-  return pageHeight - getGutterBottom(renderer) - LINE_HEIGHT;  // Reserve vertical space for title and button hints
+  const int helpTextHeight = renderer.getLineHeight(SMALL_FONT_ID) + 8;
+  return GUI.getMenuDialogContentRect(renderer, false).height - helpTextHeight;
 }
 
 void EpubReaderBookmarksActivity::loop() {
@@ -160,32 +154,13 @@ void EpubReaderBookmarksActivity::loop() {
 }
 
 void EpubReaderBookmarksActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
+  // Deliberately no clearScreen(): the reader page is already the last thing painted into the
+  // (single, shared) framebuffer, so leaving it alone lets it show through around the dialog.
   const auto orientation = renderer.getOrientation();
-  // Landscape orientation: reserve a horizontal gutter for button hints.
-  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
-  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-  // Inverted portrait: reserve vertical space for hints at the top.
-  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
   const bool isPortrait = orientation == GfxRenderer::Orientation::Portrait;
-  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 40 : 0;
-  // Landscape CW places hints on the left edge; CCW keeps them on the right.
-  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
-  const int contentWidth = pageWidth - hintGutterWidth;
-  const int hintGutterHeight = isPortraitInverted ? 50 : 0;
-  const int hintGutterBottom = getGutterBottom(renderer);
-  const int contentY = hintGutterHeight;
-  const int listY = contentY + LINE_HEIGHT;  // Reserve vertical space for title
-  const int listHeight = getListHeight(renderer);
   const int numBookmarks = bookmarks.size();
 
-  // Manual centering to honor content gutters.
-  const int titleX =
-      contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_BOOKMARKS), EpdFontFamily::BOLD)) / 2;
-  renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_BOOKMARKS), true, EpdFontFamily::BOLD);
+  const Rect contentRect = GUI.drawMenuDialog(renderer, tr(STR_BOOKMARKS), nullptr);
 
   const auto getBookmarkTitle = [this](int index) {
     return bookmarks.at(confirmingDelete >= DELETE_MODE_DISPLAY ? selectorIndex : index).summary;
@@ -208,18 +183,22 @@ void EpubReaderBookmarksActivity::render(RenderLock&&) {
 
   if (numBookmarks > 0) {
     if (confirmingDelete >= DELETE_MODE_DISPLAY) {
-      GUI.drawHelpText(renderer, Rect{0, pageHeight / 2 - LINE_HEIGHT * 2, contentWidth, LINE_HEIGHT},
+      const int confirmRowY = contentRect.y + (contentRect.height - LINE_HEIGHT) / 2;
+      GUI.drawHelpText(renderer, Rect{contentRect.x, confirmRowY - LINE_HEIGHT, contentRect.width, LINE_HEIGHT},
                        tr(STR_CONFIRM_DELETE_BOOKMARK));
 
       // render list with just the selected item for the user to confirm to delete
-      GUI.drawList(renderer, Rect{contentX, pageHeight / 2, contentWidth, LINE_HEIGHT}, 1, 0, getBookmarkTitle,
+      GUI.drawList(renderer, Rect{contentRect.x, confirmRowY, contentRect.width, LINE_HEIGHT}, 1, 0, getBookmarkTitle,
                    getBookmarkSubtitle, getBookmarkIcon);
     } else {
-      GUI.drawList(renderer, Rect{contentX, listY, contentWidth, listHeight}, numBookmarks, selectorIndex,
-                   getBookmarkTitle, getBookmarkSubtitle, getBookmarkIcon);
+      const int listHeight = getListHeight(renderer);
+      GUI.drawList(renderer, Rect{contentRect.x, contentRect.y, contentRect.width, listHeight}, numBookmarks,
+                   selectorIndex, getBookmarkTitle, getBookmarkSubtitle, getBookmarkIcon);
 
-      GUI.drawHelpText(renderer, Rect{contentX, pageHeight - hintGutterBottom, contentWidth, LINE_HEIGHT},
-                       tr(STR_HOLD_OPEN_TO_DELETE));
+      GUI.drawHelpText(
+          renderer,
+          Rect{contentRect.x, contentRect.y + listHeight, contentRect.width, contentRect.height - listHeight},
+          tr(STR_HOLD_OPEN_TO_DELETE));
     }
   }
 

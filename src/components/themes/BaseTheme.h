@@ -235,6 +235,17 @@ class BaseTheme {
   virtual void drawOptionPopup(const GfxRenderer& renderer, const char* title, const std::vector<std::string>& options,
                                int selectedIndex) const;
   virtual void fillPopupProgress(const GfxRenderer& renderer, const Rect& layout, const int progress) const;
+  // Reader-menu-style dialog: a bordered box sized proportionally to the screen (not the full
+  // screen), drawn without clearing the rest of the framebuffer so content behind it (e.g. the
+  // book page) stays visible around the edges. drawMenuDialog() paints the frame + centered
+  // title + optional subtitle and returns the inner content rect for the caller to fill in (e.g.
+  // via drawList). getMenuDialogContentRect() computes that same rect without drawing anything,
+  // so callers can size pagination (see BaseTheme::getListPageItems) from loop(), where drawing
+  // is not allowed.
+  virtual Rect drawMenuDialog(const GfxRenderer& renderer, const char* title, const char* subtitle) const;
+  virtual Rect getMenuDialogContentRect(const GfxRenderer& renderer, bool hasSubtitle) const;
+  // Internal: outer bounds shared by drawMenuDialog() and getMenuDialogContentRect().
+  Rect getMenuDialogOuterRect(const GfxRenderer& renderer) const;
   void drawStatusBar(GfxRenderer& renderer, const float bookProgress, const int currentPage, const int pageCount,
                      std::string title, const int paddingBottom = 0, const int textYOffset = 0,
                      const bool fillMargin = true, const bool isPageBookmarked = false,

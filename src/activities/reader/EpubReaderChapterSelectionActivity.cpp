@@ -28,7 +28,8 @@ void EpubReaderChapterSelectionActivity::onEnter() {
 void EpubReaderChapterSelectionActivity::onExit() { Activity::onExit(); }
 
 void EpubReaderChapterSelectionActivity::loop() {
-  const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
+  const int pageItems =
+      GUI.getListPageItems(GUI.getMenuDialogContentRect(renderer, false).height, false);
   const int totalItems = getTotalItems();
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
@@ -71,24 +72,16 @@ void EpubReaderChapterSelectionActivity::loop() {
 }
 
 void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  auto metrics = UITheme::getInstance().getMetrics();
-  Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-
-  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
-                 tr(STR_SELECT_CHAPTER));
-
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int contentHeight = screen.height - contentTop - metrics.verticalSpacing;
-
+  // Deliberately no clearScreen(): the reader page is already the last thing painted into the
+  // (single, shared) framebuffer, so leaving it alone lets it show through around the dialog.
   const int totalItems = getTotalItems();
-  GUI.drawList(renderer, Rect{screen.x, contentTop, screen.width, contentHeight}, totalItems, selectorIndex,
-               [this](int index) {
-                 auto item = epub->getTocItem(index);
-                 std::string indent((item.level - 1) * 2, ' ');
-                 return indent + item.title;
-               });
+  const Rect listRect = GUI.drawMenuDialog(renderer, tr(STR_SELECT_CHAPTER), nullptr);
+
+  GUI.drawList(renderer, listRect, totalItems, selectorIndex, [this](int index) {
+    auto item = epub->getTocItem(index);
+    std::string indent((item.level - 1) * 2, ' ');
+    return indent + item.title;
+  });
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

@@ -4,6 +4,7 @@
 #include <HalGPIO.h>
 #include <I18n.h>
 
+#include <algorithm>
 #include <cstdio>
 
 #include "MappedInputManager.h"
@@ -65,26 +66,23 @@ void EpubReaderPercentSelectionActivity::loop() {
 }
 
 void EpubReaderPercentSelectionActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
+  // Deliberately no clearScreen(): the reader page is already the last thing painted into the
+  // (single, shared) framebuffer, so leaving it alone lets it show through around the dialog.
   auto& theme = UITheme::getInstance();
   auto metrics = theme.getMetrics();
-  Rect screen = theme.getScreenSafeArea(renderer, true, false);
+  const Rect content = GUI.drawMenuDialog(renderer, tr(STR_GO_TO_PERCENT), nullptr);
 
-  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
-                 tr(STR_GO_TO_PERCENT));
-
-  const int contentTop = screen.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing * 4;
+  const int contentTop = content.y + metrics.verticalSpacing;
 
   const std::string percentText = std::to_string(percent) + "%";
-  UITheme::drawCenteredText(renderer, screen, UI_12_FONT_ID, contentTop, percentText.c_str(), true,
+  UITheme::drawCenteredText(renderer, content, UI_12_FONT_ID, contentTop, percentText.c_str(), true,
                             EpdFontFamily::BOLD);
 
-  // Draw slider track.
-  constexpr int barWidth = 360;
+  // Draw slider track, capped to the dialog's inner width.
+  const int barWidth = std::min(360, content.width - 20);
   constexpr int barHeight = 16;
-  const int barX = screen.x + (screen.width - barWidth) / 2;
-  const int barY = contentTop + metrics.verticalSpacing * 2;
+  const int barX = content.x + (content.width - barWidth) / 2;
+  const int barY = contentTop + metrics.verticalSpacing * 2 + renderer.getLineHeight(UI_12_FONT_ID);
 
   renderer.drawRect(barX, barY, barWidth, barHeight);
 
@@ -102,9 +100,9 @@ void EpubReaderPercentSelectionActivity::render(RenderLock&&) {
   // buttons = coarse step), so the layout doesn't depend on a separator hidden in translated text.
   char line[64];
   snprintf(line, sizeof(line), "%s %d%%", I18N.get(StrId::STR_STEP_HINT_FRONT), kSmallStep);
-  UITheme::drawCenteredText(renderer, screen, SMALL_FONT_ID, barY + 30, line, true);
+  UITheme::drawCenteredText(renderer, content, SMALL_FONT_ID, barY + 30, line, true);
   snprintf(line, sizeof(line), "%s %d%%", I18N.get(StrId::STR_STEP_HINT_SIDE), kLargeStep);
-  UITheme::drawCenteredText(renderer, screen, SMALL_FONT_ID, barY + 52, line, true);
+  UITheme::drawCenteredText(renderer, content, SMALL_FONT_ID, barY + 52, line, true);
 
   // Button hints follow the current front button layout.
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "-", "+");

@@ -25,6 +25,10 @@ constexpr int bookmarkStatusIconWidth = 16;
 constexpr int bookmarkStatusIconHeight = 14;
 constexpr int bookmarkStatusIconGap = 4;
 constexpr int bookmarkStatusIconTopCrop = 2;
+// Reader-menu-style dialogs (the reader menu itself and the screens it opens) are sized
+// proportionally to the screen so the content behind them stays visible around the edges.
+constexpr int menuDialogWidthPercent = 85;
+constexpr int menuDialogHeightPercent = 75;
 
 bool statusBarTextLaneVisible() {
   return SETTINGS.statusBarChapterPageCount || SETTINGS.statusBarBookProgressPercentage ||
@@ -1104,4 +1108,70 @@ void BaseTheme::drawOptionPopup(const GfxRenderer& renderer, const char* title, 
     const bool invertText = selected ? metrics.optionPopupSelectionLight : true;
     renderer.drawText(optionFontId, textX, textY, labelText, invertText, optionStyle);
   }
+}
+
+Rect BaseTheme::getMenuDialogOuterRect(const GfxRenderer& renderer) const {
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  const int dialogW = screenW * menuDialogWidthPercent / 100;
+  const int dialogH = screenH * menuDialogHeightPercent / 100;
+  return Rect{(screenW - dialogW) / 2, (screenH - dialogH) / 2, dialogW, dialogH};
+}
+
+Rect BaseTheme::getMenuDialogContentRect(const GfxRenderer& renderer, bool hasSubtitle) const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect outerRect = getMenuDialogOuterRect(renderer);
+  const int innerPadding = metrics.optionPopupInnerPadding;
+
+  int y = outerRect.y + innerPadding + renderer.getLineHeight(UI_12_FONT_ID);
+  if (hasSubtitle) {
+    y += renderer.getLineHeight(SMALL_FONT_ID);
+  }
+  y += metrics.optionPopupTitleGap;
+
+  const int contentHeight = outerRect.y + outerRect.height - innerPadding - y;
+  return Rect{outerRect.x + innerPadding, y, outerRect.width - innerPadding * 2, contentHeight};
+}
+
+Rect BaseTheme::drawMenuDialog(const GfxRenderer& renderer, const char* title, const char* subtitle) const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int frameThickness = metrics.popupFrameThickness;
+  const int frameRadius = metrics.popupCornerRadius;
+  const bool hasSubtitle = subtitle && subtitle[0] != '\0';
+  const Rect outerRect = getMenuDialogOuterRect(renderer);
+
+  // Frame: same inset-fill pattern as drawOptionPopup, but sized proportionally to the
+  // screen instead of to content, so content behind it (the book page) stays visible
+  // around the edges rather than the dialog taking over the whole screen.
+  if (frameRadius > 0) {
+    renderer.fillRoundedRect(outerRect.x - frameThickness, outerRect.y - frameThickness,
+                             outerRect.width + frameThickness * 2, outerRect.height + frameThickness * 2,
+                             frameRadius + frameThickness, Color::White);
+    renderer.fillRoundedRect(outerRect.x, outerRect.y, outerRect.width, outerRect.height, frameRadius, Color::Black);
+    renderer.fillRoundedRect(outerRect.x + frameThickness, outerRect.y + frameThickness,
+                             outerRect.width - frameThickness * 2, outerRect.height - frameThickness * 2,
+                             frameRadius - frameThickness > 0 ? frameRadius - frameThickness : 0, Color::White);
+  } else {
+    renderer.fillRect(outerRect.x - frameThickness, outerRect.y - frameThickness,
+                      outerRect.width + frameThickness * 2, outerRect.height + frameThickness * 2, true);
+    renderer.fillRect(outerRect.x, outerRect.y, outerRect.width, outerRect.height, false);
+  }
+
+  int y = outerRect.y + metrics.optionPopupInnerPadding;
+
+  renderer.drawCenteredText(UI_12_FONT_ID, y, title, true, EpdFontFamily::BOLD);
+  y += renderer.getLineHeight(UI_12_FONT_ID);
+
+  if (hasSubtitle) {
+    renderer.drawCenteredText(SMALL_FONT_ID, y, subtitle, true);
+    y += renderer.getLineHeight(SMALL_FONT_ID);
+  }
+
+  if (metrics.optionPopupTitleSeparator) {
+    const int sepY = y + metrics.optionPopupTitleGap / 2;
+    renderer.drawLine(outerRect.x + metrics.optionPopupInnerPadding, sepY,
+                      outerRect.x + outerRect.width - metrics.optionPopupInnerPadding, sepY, true);
+  }
+
+  return getMenuDialogContentRect(renderer, hasSubtitle);
 }
